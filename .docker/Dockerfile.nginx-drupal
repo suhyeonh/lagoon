@@ -4,6 +4,9 @@ FROM ${CLI_IMAGE} as cli
 
 FROM uselagoon/nginx-drupal:${LAGOON_IMAGE_VERSION}
 
+# @see https://github.com/uselagoon/lagoon-images/pull/979
+COPY .docker/images/nginx/fastcgi.conf /etc/nginx/fastcgi.conf
+
 # nginx config.
 COPY .docker/images/nginx/no-robots.sh /lagoon/entrypoints/20-no-robots.sh
 
