@@ -58,7 +58,7 @@ workflow:
     - sed -i -e "s/^GOVCMS_RELEASE_TAG.*/GOVCMS_RELEASE_TAG=$DEPLOY_TAG/" .env
     # Determine and use latest distribution release branch if USE_LATEST_RELEASE_BRANCH is set
     - |
-      if [ -z "$USE_LATEST_RELEASE_BRANCH"]; then
+      if [ ! -z "$USE_LATEST_RELEASE_BRANCH" ]; then
         echo "Determining latest release branch in use at govcms/govcms"
         WORKING_DIR=`pwd`
         cd /tmp && git clone https://github.com/govCMS/GovCMS.git && cd GovCMS
