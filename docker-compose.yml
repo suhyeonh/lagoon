@@ -1,5 +1,3 @@
-version: '3.0'
-
 # Mount for easier dev
 x-volumes: &default-volumes
   volumes:
