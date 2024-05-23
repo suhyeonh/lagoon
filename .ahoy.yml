@@ -91,7 +91,6 @@ commands:
 
   audit-site:
     usage: Run site audit
-    cmd: docker compose exec -T cli drutiny profile:run d8-full @self "$@"
 
   lint:
     usage: Lint code
