@@ -98,10 +98,15 @@ deploy:multiarch:
   variables:
     <<: *variables
   script:
+    # Install ahoy into the runner image.
+    - |
+      os=$(uname -s | tr [:upper:] [:lower:]) && architecture=$(case $(uname -m) in x86_64 | amd64) echo "amd64" ;; aarch64 | arm64 | armv8) echo "arm64" ;; *) echo "amd64" ;; esac) \
+        && wget -q https://github.com/ahoy-cli/ahoy/releases/download/v2.1.1/ahoy-bin-$os-$architecture -O /usr/local/bin/ahoy \
+        && chmod +x /usr/local/bin/ahoy
+    - apk add bash curl
     - cp .env.default .env
     - sed -i -e "s/^GOVCMS_RELEASE_TAG.*/GOVCMS_RELEASE_TAG=$DEPLOY_TAG/" .env
     - cat .env
-    #- update-binfmts --enable # Important: Ensures execution of other binary formats is enabled in the kernel
     - docker buildx create --name govcms-amd-arm --platform linux/amd64,linux/arm64
     - docker buildx ls
     - export $(grep -v '^#' .env | xargs)
