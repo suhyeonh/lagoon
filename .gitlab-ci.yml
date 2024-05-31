@@ -67,10 +67,8 @@ workflow:
     - |
       if [ ! -z "$USE_LATEST_RELEASE_BRANCH" ]; then
         echo "Determining latest release branch in use at govcms/govcms"
-        WORKING_DIR=`pwd`
-        cd /tmp && git clone https://github.com/govCMS/GovCMS.git && cd GovCMS
-        LATEST=`git for-each-ref --sort=-committerdate refs/remotes/ --format='%(refname)' | sed 's/refs\/remotes\/origin\///g' | grep release/3.x/ | head -1`
-        cd $WORKING_DIR
+        git clone https://github.com/govCMS/GovCMS.git /tmp/govcms || true
+        LATEST=$(git -C /tmp/govcms for-each-ref --sort=-committerdate refs/remotes/ --format='%(refname)' | sed 's/refs\/remotes\/origin\///g' | grep release/3.x/ | head -1)
         sed -i -e "s#^GOVCMS_PROJECT_VERSION.*#GOVCMS_PROJECT_VERSION=dev-$LATEST#" .env
       fi
     - cat .env
