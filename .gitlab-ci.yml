@@ -60,7 +60,7 @@ workflow:
       os=$(uname -s | tr [:upper:] [:lower:]) && architecture=$(case $(uname -m) in x86_64 | amd64) echo "amd64" ;; aarch64 | arm64 | armv8) echo "arm64" ;; *) echo "amd64" ;; esac) \
         && wget -q https://github.com/ahoy-cli/ahoy/releases/download/v2.1.1/ahoy-bin-$os-$architecture -O /usr/local/bin/ahoy \
         && chmod +x /usr/local/bin/ahoy
-    - apk add bash curl
+    - apk add bash curl git
     - cp .env.default .env
     - sed -i -e "s/^GOVCMS_RELEASE_TAG.*/GOVCMS_RELEASE_TAG=$DEPLOY_TAG/" .env
     # Determine and use latest distribution release branch if USE_LATEST_RELEASE_BRANCH is set
@@ -103,7 +103,7 @@ deploy:multiarch:
       os=$(uname -s | tr [:upper:] [:lower:]) && architecture=$(case $(uname -m) in x86_64 | amd64) echo "amd64" ;; aarch64 | arm64 | armv8) echo "arm64" ;; *) echo "amd64" ;; esac) \
         && wget -q https://github.com/ahoy-cli/ahoy/releases/download/v2.1.1/ahoy-bin-$os-$architecture -O /usr/local/bin/ahoy \
         && chmod +x /usr/local/bin/ahoy
-    - apk add bash curl
+    - apk add bash curl git
     - cp .env.default .env
     - sed -i -e "s/^GOVCMS_RELEASE_TAG.*/GOVCMS_RELEASE_TAG=$DEPLOY_TAG/" .env
     - cat .env
