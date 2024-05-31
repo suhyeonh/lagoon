@@ -101,7 +101,7 @@ deploy:multiarch:
     - cp .env.default .env
     - sed -i -e "s/^GOVCMS_RELEASE_TAG.*/GOVCMS_RELEASE_TAG=$DEPLOY_TAG/" .env
     - cat .env
-    - update-binfmts --enable # Important: Ensures execution of other binary formats is enabled in the kernel
+    #- update-binfmts --enable # Important: Ensures execution of other binary formats is enabled in the kernel
     - docker buildx create --name govcms-amd-arm --platform linux/amd64,linux/arm64
     - docker buildx ls
     - export $(grep -v '^#' .env | xargs)
