@@ -103,6 +103,13 @@ deploy:multiarch:
     - apk add bash curl jq
     - cp .env.default .env
     - sed -i -e "s/^GOVCMS_RELEASE_TAG.*/GOVCMS_RELEASE_TAG=$DEPLOY_TAG/" .env
+    # Determine and use latest distribution release branch if USE_LATEST_RELEASE_BRANCH is set
+    - |
+      if [ ! -z "$USE_LATEST_RELEASE_BRANCH" ]; then
+        echo "Determining latest release branch in use at govcms/govcms"
+        LATEST=$(curl -H "Authorization: token $GITHUB_TOKEN" -s https://api.github.com/repos/govCMS/GovCMS/branches | jq -r '.[].name' | grep release | sort -r | head -n 1)
+        sed -i -e "s#^GOVCMS_PROJECT_VERSION.*#GOVCMS_PROJECT_VERSION=dev-$LATEST#" .env
+      fi
     - cat .env
     - docker buildx create --name govcms-amd-arm --platform linux/amd64,linux/arm64
     - docker buildx ls
