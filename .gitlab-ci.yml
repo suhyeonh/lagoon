@@ -60,17 +60,14 @@ workflow:
       os=$(uname -s | tr [:upper:] [:lower:]) && architecture=$(case $(uname -m) in x86_64 | amd64) echo "amd64" ;; aarch64 | arm64 | armv8) echo "arm64" ;; *) echo "amd64" ;; esac) \
         && wget -q https://github.com/ahoy-cli/ahoy/releases/download/v2.1.1/ahoy-bin-$os-$architecture -O /usr/local/bin/ahoy \
         && chmod +x /usr/local/bin/ahoy
-    - apk add bash curl
+    - apk add bash curl jq
     - cp .env.default .env
     - sed -i -e "s/^GOVCMS_RELEASE_TAG.*/GOVCMS_RELEASE_TAG=$DEPLOY_TAG/" .env
     # Determine and use latest distribution release branch if USE_LATEST_RELEASE_BRANCH is set
     - |
       if [ ! -z "$USE_LATEST_RELEASE_BRANCH" ]; then
         echo "Determining latest release branch in use at govcms/govcms"
-        WORKING_DIR=`pwd`
-        cd /tmp && git clone https://github.com/govCMS/GovCMS.git && cd GovCMS
-        LATEST=`git for-each-ref --sort=-committerdate refs/remotes/ --format='%(refname)' | sed 's/refs\/remotes\/origin\///g' | grep release/3.x/ | head -1`
-        cd $WORKING_DIR
+        LATEST=$(curl -H "Authorization: token $GITHUB_TOKEN" -s https://api.github.com/repos/govCMS/GovCMS/branches | jq -r '.[].name' | grep release | sort -r | head -n 1)
         sed -i -e "s#^GOVCMS_PROJECT_VERSION.*#GOVCMS_PROJECT_VERSION=dev-$LATEST#" .env
       fi
     - cat .env
@@ -98,10 +95,22 @@ deploy:multiarch:
   variables:
     <<: *variables
   script:
+    # Install ahoy into the runner image.
+    - |
+      os=$(uname -s | tr [:upper:] [:lower:]) && architecture=$(case $(uname -m) in x86_64 | amd64) echo "amd64" ;; aarch64 | arm64 | armv8) echo "arm64" ;; *) echo "amd64" ;; esac) \
+        && wget -q https://github.com/ahoy-cli/ahoy/releases/download/v2.1.1/ahoy-bin-$os-$architecture -O /usr/local/bin/ahoy \
+        && chmod +x /usr/local/bin/ahoy
+    - apk add bash curl jq
     - cp .env.default .env
     - sed -i -e "s/^GOVCMS_RELEASE_TAG.*/GOVCMS_RELEASE_TAG=$DEPLOY_TAG/" .env
+    # Determine and use latest distribution release branch if USE_LATEST_RELEASE_BRANCH is set
+    - |
+      if [ ! -z "$USE_LATEST_RELEASE_BRANCH" ]; then
+        echo "Determining latest release branch in use at govcms/govcms"
+        LATEST=$(curl -H "Authorization: token $GITHUB_TOKEN" -s https://api.github.com/repos/govCMS/GovCMS/branches | jq -r '.[].name' | grep release | sort -r | head -n 1)
+        sed -i -e "s#^GOVCMS_PROJECT_VERSION.*#GOVCMS_PROJECT_VERSION=dev-$LATEST#" .env
+      fi
     - cat .env
-    - update-binfmts --enable # Important: Ensures execution of other binary formats is enabled in the kernel
     - docker buildx create --name govcms-amd-arm --platform linux/amd64,linux/arm64
     - docker buildx ls
     - export $(grep -v '^#' .env | xargs)
