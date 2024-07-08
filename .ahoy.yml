@@ -89,10 +89,6 @@ commands:
     usage: Pull latest docker images.
     cmd: docker image ls --format \"{{.Repository}}:{{.Tag}}\" | grep govcms/ | grep -v none | xargs -n1 docker pull | cat
 
-  audit-site:
-    usage: Run site audit
-    cmd: docker compose exec -T cli drutiny profile:run d8-full @self "$@"
-
   lint:
     usage: Lint code
     cmd: docker compose exec cli lint-govcms
@@ -124,7 +120,12 @@ commands:
       fi
   test-goss:
     usage: Validate images with dgoss.
-    cmd: ./tests/goss/run_all.sh
+    cmd: |
+      curl -L https://github.com/goss-org/goss/releases/latest/download/goss-linux-amd64 -o /usr/local/bin/goss
+      chmod +rx /usr/local/bin/goss
+      curl -L https://github.com/goss-org/goss/releases/latest/download/dgoss -o /usr/local/bin/dgoss
+      chmod +rx /usr/local/bin/dgoss
+      ./tests/goss/run_all.sh
 
   test-install:
     usage: Test a blank install.
@@ -133,6 +134,8 @@ commands:
   test-nginx:
     usage: Validate the nginx image.
     cmd: |
+      apk update && apk add --no-cache php php-phar php-json php-openssl php-mbstring php-dom php-tokenizer php-xml php-xmlwriter
+      curl -sS https://getcomposer.org/installer -o composer-setup.php && php composer-setup.php --install-dir=/usr/local/bin --filename=composer && rm composer-setup.php
       docker compose exec -T test dockerize -wait tcp://nginx:8080 -timeout 1m
       docker compose exec -T nginx nginx -t
       composer validate --strict -d .docker/images/nginx/tests

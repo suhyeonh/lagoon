@@ -1,5 +1,3 @@
-version: '3.0'
-
 # Mount for easier dev
 x-volumes: &default-volumes
   volumes:
@@ -44,7 +42,7 @@ services:
     environment:
       LAGOON_ROUTE: ${LOCALDEV_URL:-http://govcmslagoon.docker.amazee.io}
       LAGOON_LOCALDEV_URL: ${LOCALDEV_URL_NGINX:-http://govcms-lagoon-nginx.docker.amazee.io}
-      X_FRAME_OPTIONS: ${X_FRAME_OPTIONS:-SameOrigin}
+      X_FRAME_OPTIONS: ${X_FRAME_OPTIONS:-SAMEORIGIN}
     networks:
       - amazeeio-network
       - default

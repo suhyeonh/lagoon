@@ -1,8 +1,8 @@
 ---
-image: gitlab-registry-production.govcms.amazee.io/govcms/govcms-ci/govcms-ci-buildx
+image: docker:26.1.3-cli
 
 services:
-  - name: gitlab-registry-production.govcms.amazee.io/govcms/govcms-ci/dind:latest
+  - name: docker:26.1.3-dind
     command: ["--tls=false"]
 
 stages:
@@ -27,36 +27,14 @@ workflow:
       variables:
         DEPLOY_TAG: "10.x-beta"
 
-    ## D9
-    - if: $CI_COMMIT_REF_NAME == "2.x-develop"
-      variables:
-        DEPLOY_TAG: "9.x-edge"
-    - if: $CI_COMMIT_REF_NAME == "2.x-master"
-      variables:
-        DEPLOY_TAG: "9.x-latest"
-    - if: $CI_COMMIT_REF_NAME =~ /^release\/2.x\//
-      variables:
-        DEPLOY_TAG: "9.x-beta"
-    - if: $CI_COMMIT_REF_NAME == "feature/2.x/php8"
-      variables:
-        DEPLOY_TAG: "9.x-php8"
-
-    ## D8
-    - if: $CI_COMMIT_REF_NAME == "1.x-develop"
-      variables:
-        DEPLOY_TAG: "8.x-edge"
-    - if: $CI_COMMIT_REF_NAME == "1.x-master"
-      variables:
-        DEPLOY_TAG: "8.x-latest"
-
     ## Release tags.
     - if: $CI_COMMIT_TAG != null
       variables:
         DEPLOY_TAG: $CI_COMMIT_TAG
 
-    - if: $CI_COMMIT_REF_NAME =~ /feature/
+    - if: $CI_COMMIT_REF_NAME =~ /^(feature|feat|fix)/
       variables:
-        DEPLOY_TAG: "9.x-dev"
+        DEPLOY_TAG: "10.x-dev"
 
     - when: always # Run the pipeline in other cases
 
@@ -70,21 +48,44 @@ workflow:
   DOCKER_HOST: tcp://localhost:2375
   BUILDKIT_INLINE_CACHE: '1'
   DOCKER_DRIVER: overlay2
+  GOSS_FILES_STRATEGY: cp
 
 .before_script_build: &before_script_build
   before_script:
     - if [ -z "$DEPLOY_TAG" ]; then echo "DEPLOY_TAG must be set for an actionable build."; exit 1; fi
     # Latest tags need a confirmation var (provided manually: DEPLOY_LATEST)
-    - if [[ "$DEPLOY_TAG" == "8.x-latest"  ||  "$DEPLOY_TAG" == "9.x-latest" || "$DEPLOY_TAG" == "10.x-latest" ]] && [ -z "$DEPLOY_LATEST" ]; then echo "DEPLOY_LATEST must be set to progress with 'latest' tags."; exit 1; fi
+    - if [[ "$DEPLOY_TAG" == "10.x-latest" ]] && [ -z "$DEPLOY_LATEST" ]; then echo "DEPLOY_LATEST must be set to progress with 'latest' tags."; exit 1; fi
+    # Install ahoy into the runner image.
+    - |
+      os=$(uname -s | tr [:upper:] [:lower:]) && architecture=$(case $(uname -m) in x86_64 | amd64) echo "amd64" ;; aarch64 | arm64 | armv8) echo "arm64" ;; *) echo "amd64" ;; esac) \
+        && wget -q https://github.com/ahoy-cli/ahoy/releases/download/v2.1.1/ahoy-bin-$os-$architecture -O /usr/local/bin/ahoy \
+        && chmod +x /usr/local/bin/ahoy
+    - apk add bash curl jq
     - cp .env.default .env
     - sed -i -e "s/^GOVCMS_RELEASE_TAG.*/GOVCMS_RELEASE_TAG=$DEPLOY_TAG/" .env
+    # Determine and use latest distribution release branch if USE_LATEST_RELEASE_BRANCH is set
+    - |
+      if [ ! -z "$USE_LATEST_RELEASE_BRANCH" ]; then
+        echo "Determining latest release branch in use at govcms/govcms"
+        LATEST=$(curl -H "Authorization: token $GITHUB_TOKEN" -s https://api.github.com/repos/govCMS/GovCMS/branches | jq -r '.[].name' | grep release | sort -r | head -n 1)
+        sed -i -e "s#^GOVCMS_PROJECT_VERSION.*#GOVCMS_PROJECT_VERSION=dev-$LATEST#" .env
+      fi
     - cat .env
-    - update-binfmts --enable # Important: Ensures execution of other binary formats is enabled in the kernel
     - export $(grep -v '^#' .env | xargs)
     - docker network prune -f && docker network inspect amazeeio-network >/dev/null || docker network create amazeeio-network
     - docker login -u $DOCKER_USER -p $DOCKER_PASS
+    - |
+      cat << EOF > auth.json
+      {
+          "github-oauth": {
+              "github.com": "$GITHUB_TOKEN"
+          }
+      }
+      EOF
+    - docker swarm init
+    - docker secret create composer-auth auth.json
+    - ahoy --version
     - ahoy build y
-    - docker image list
 
 # ---
 # Job Definitions
@@ -94,10 +95,22 @@ deploy:multiarch:
   variables:
     <<: *variables
   script:
+    # Install ahoy into the runner image.
+    - |
+      os=$(uname -s | tr [:upper:] [:lower:]) && architecture=$(case $(uname -m) in x86_64 | amd64) echo "amd64" ;; aarch64 | arm64 | armv8) echo "arm64" ;; *) echo "amd64" ;; esac) \
+        && wget -q https://github.com/ahoy-cli/ahoy/releases/download/v2.1.1/ahoy-bin-$os-$architecture -O /usr/local/bin/ahoy \
+        && chmod +x /usr/local/bin/ahoy
+    - apk add bash curl jq
     - cp .env.default .env
     - sed -i -e "s/^GOVCMS_RELEASE_TAG.*/GOVCMS_RELEASE_TAG=$DEPLOY_TAG/" .env
+    # Determine and use latest distribution release branch if USE_LATEST_RELEASE_BRANCH is set
+    - |
+      if [ ! -z "$USE_LATEST_RELEASE_BRANCH" ]; then
+        echo "Determining latest release branch in use at govcms/govcms"
+        LATEST=$(curl -H "Authorization: token $GITHUB_TOKEN" -s https://api.github.com/repos/govCMS/GovCMS/branches | jq -r '.[].name' | grep release | sort -r | head -n 1)
+        sed -i -e "s#^GOVCMS_PROJECT_VERSION.*#GOVCMS_PROJECT_VERSION=dev-$LATEST#" .env
+      fi
     - cat .env
-    - update-binfmts --enable # Important: Ensures execution of other binary formats is enabled in the kernel
     - docker buildx create --name govcms-amd-arm --platform linux/amd64,linux/arm64
     - docker buildx ls
     - export $(grep -v '^#' .env | xargs)
